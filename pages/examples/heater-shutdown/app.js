@@ -1,23 +1,12 @@
 const byId = (id) => document.getElementById(id);
-const stages = ["predict", "simulate", "verify"];
 const limit = 80;
+const repository = "https://github.com/Sebastian-Kom/formal-verification-lab";
+let manifest;
+let sources;
+let order = "original";
+let requestNumber = 0;
 let trace = [];
 let selected = 0;
-let prediction = "";
-let simulationRevision = "";
-let loadingReport = false;
-let reportReady = false;
-
-function showStage(name) {
-  for (const stage of stages) {
-    byId(stage).hidden = stage !== name;
-    const button = byId("step-" + stage);
-    if (stage === name) button.setAttribute("aria-current", "step");
-    else button.removeAttribute("aria-current");
-  }
-  byId(name + "-title").focus();
-  if (name === "simulate") drawPlot();
-}
 
 function parseTrace(text) {
   const lines = text.trim().split(/\r?\n/);
@@ -126,49 +115,6 @@ function drawPlot() {
   }
 }
 
-const form = byId("prediction-form");
-form.addEventListener("change", () => {
-  byId("run").disabled = !form.elements.prediction.value;
-  byId("run-message").textContent = "";
-  const matchesRun = trace.length > 0 && form.elements.prediction.value === prediction;
-  byId("step-simulate").disabled = !matchesRun;
-  byId("step-verify").disabled = !matchesRun;
-});
-
-form.addEventListener("submit", async event => {
-  event.preventDefault();
-  const answer = form.elements.prediction.value;
-  if (!answer || byId("run").disabled) return;
-  form.querySelector("fieldset").disabled = true;
-  byId("run").disabled = true;
-  byId("run-message").textContent = "Running the C controller…";
-  try {
-    const {runSimulation, sourceRevision} = await import("./simulation.mjs");
-    if (!/^[a-f0-9]{40}$/.test(sourceRevision)) throw new Error("Missing simulation version");
-    const rows = parseTrace(await runSimulation());
-    const firstAtLimit = rows.findIndex(row => row.a >= limit || row.b >= limit);
-    if (firstAtLimit < 0) throw new Error("The simulation did not reach the prediction scenario");
-    trace = rows;
-    prediction = answer;
-    simulationRevision = sourceRevision;
-    fillTraceTable();
-    byId("your-pick").textContent = answer;
-    byId("cycle").min = 0;
-    byId("cycle").max = rows.length - 1;
-    selectCycle(firstAtLimit);
-    byId("step-simulate").disabled = false;
-    byId("step-verify").disabled = false;
-    byId("run-message").textContent = "";
-    showStage("simulate");
-  } catch (error) {
-    console.error(error);
-    byId("run-message").textContent = "The simulation could not run. Check your connection and retry in a browser with WebAssembly support.";
-  } finally {
-    form.querySelector("fieldset").disabled = false;
-    byId("run").disabled = false;
-  }
-});
-
 function displayEvidence(report) {
   if (!/^[a-f0-9]{40}$/.test(report.commit) || !Array.isArray(report.rules) ||
       report.rules.length !== 4 || !Array.isArray(report.eva?.invalid) ||
@@ -194,59 +140,160 @@ function displayEvidence(report) {
   }
   if (!report.eva.invalid.every(id => ids.has(id))) throw new Error("Invalid Eva result");
   byId("rule-list").replaceChildren(list);
-  let finding;
+  const proved = report.rules.filter(rule => rule.status === "PROVED").length;
+  byId("wp-summary").textContent = "WP proved " + proved + " of 4 requirements";
+  let finding = "Eva reported no invalid requirement in this simulation.";
   if (!report.eva.ran) {
-    finding = "The verification build did not run Eva for this version.";
+    finding = "The build did not run Eva for this order.";
   } else if (report.eva.invalid.length) {
-    finding = "Eva marked " + report.eva.invalid.join(", ") + " invalid. The controller broke " +
-      (report.eva.invalid.length === 1 ? "this promise" : "these promises") + " during the simulated run.";
-  } else {
-    finding = "Eva reported no invalid requirement in this simulation.";
+    finding = "Eva found a violation in the simulated run and marked " + report.eva.invalid.join(", ") + " invalid.";
   }
   byId("eva-outcome").textContent = finding;
   byId("eva-link").hidden = !report.eva.ran;
-  const versionUrl = "https://github.com/Sebastian-Kom/formal-verification-lab/tree/" + report.commit + "/examples/heater-shutdown";
-  const version = byId("version-link");
-  version.textContent = report.commit.slice(0, 8);
-  version.href = versionUrl;
-  byId("proof-model").textContent = report.machineModel ? " · Proof model " + report.machineModel : "";
-  byId("study-source").href = versionUrl;
+  byId("proof-model").textContent = "Frama-C " + report.frama_c + " · " + report.machineModel;
+  byId("source-link").href = assetUrl(order, "controller.c");
+  byId("wp-report-link").href = assetUrl(order, "wp.json");
+  byId("wp-log-link").href = assetUrl(order, "wp.log");
+  byId("eva-link").href = assetUrl(order, "eva.log");
 }
 
-async function revealReport() {
-  if (!trace.length) return;
-  showStage("verify");
-  if (reportReady || loadingReport) return;
-  loadingReport = true;
-  byId("report-message").textContent = "Loading the verification report…";
-  byId("retry-report").hidden = true;
+function assetUrl(variant, file) {
+  const url = new URL("./" + variant + "/" + file, import.meta.url);
+  url.searchParams.set("revision", manifest.commit);
+  url.searchParams.set("source", manifest.variants[variant].controllerSha256);
+  return url.href;
+}
+
+async function fetchAsset(url) {
+  const response = await fetch(url, {cache: "no-cache"});
+  if (!response.ok) throw new Error("Could not load " + url);
+  return response;
+}
+
+async function fetchSource(variant) {
+  const file = await (await fetchAsset(assetUrl(variant, "controller.c"))).arrayBuffer();
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", file));
+  const digest = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+  if (digest !== manifest.variants[variant].controllerSha256) throw new Error("Source version mismatch");
+  return new TextDecoder().decode(file).replace(/\r?\n$/, "").split(/\r?\n/);
+}
+
+function renderSource() {
+  const rows = document.createDocumentFragment();
+  for (const [index, text] of sources[order].entries()) {
+    const line = document.createElement("span");
+    line.className = manifest.editableLines.includes(index + 1) ? "code-line movable" : "code-line";
+    const number = document.createElement("span");
+    number.className = "line-number";
+    number.setAttribute("aria-hidden", "true");
+    number.textContent = index + 1;
+    const code = document.createElement("span");
+    code.textContent = text;
+    line.append(number, code);
+    rows.append(line);
+  }
+  byId("source-code").replaceChildren(rows);
+  byId("order-label").textContent = order === "original" ? "Original order" : "Swapped order";
+}
+
+async function openEditor() {
+  byId("retry-source").hidden = true;
+  byId("activity").textContent = "Loading controller.c…";
   try {
-    const response = await fetch("./evidence.json?revision=" + simulationRevision);
-    if (!response.ok) throw new Error("Report request failed");
-    const report = await response.json();
-    if (report.commit && report.commit !== simulationRevision) {
-      byId("report-message").textContent = "A new version has been published. Reload this page to run the simulation and view the matching results.";
-      return;
+    manifest = await (await fetchAsset("./variants.json")).json();
+    if (!/^[a-f0-9]{40}$/.test(manifest.commit) ||
+        !["original", "swapped"].every(key => /^[a-f0-9]{64}$/.test(manifest.variants?.[key]?.controllerSha256)) ||
+        !Array.isArray(manifest.editableLines) || manifest.editableLines.length !== 2 ||
+        !manifest.editableLines.every(n => Number.isSafeInteger(n) && n > 0)) {
+      throw new Error("Invalid source manifest");
     }
-    displayEvidence(report);
-    reportReady = true;
-    byId("report-body").hidden = false;
-    byId("report-message").textContent = "";
+    const [original, swapped] = await Promise.all([fetchSource("original"), fetchSource("swapped")]);
+    sources = {original, swapped};
+    renderSource();
+    byId("contract-link").href = repository + "/blob/" + manifest.commit + "/examples/heater-shutdown/include/controller.h";
+    byId("modules-link").href = repository + "/tree/" + manifest.commit + "/examples/heater-shutdown/src";
+    for (const id of ["demo-button", "verify-button", "swap-button"]) byId(id).disabled = false;
+    byId("activity").textContent = "";
   } catch (error) {
     console.error(error);
-    byId("report-message").textContent = "The verification report could not be loaded. Check your connection and try again.";
-    byId("retry-report").hidden = false;
-  } finally {
-    loadingReport = false;
+    byId("activity").textContent = "The source files could not be loaded. Check your connection and reload the code.";
+    byId("retry-source").hidden = false;
   }
 }
 
-byId("step-predict").addEventListener("click", () => showStage("predict"));
-byId("step-simulate").addEventListener("click", () => showStage("simulate"));
-byId("step-verify").addEventListener("click", revealReport);
-byId("show-report").addEventListener("click", revealReport);
-byId("retry-report").addEventListener("click", revealReport);
-byId("back-to-trace").addEventListener("click", () => showStage("simulate"));
+function hideResults() {
+  byId("simulate").hidden = true;
+  byId("verify").hidden = true;
+}
+
+function swapCalls() {
+  requestNumber++;
+  order = order === "original" ? "swapped" : "original";
+  hideResults();
+  trace = [];
+  renderSource();
+  byId("activity").textContent = "Call order changed. Choose Demo or Verify to see the result for this order.";
+}
+
+function showResult(section) {
+  byId(section).hidden = false;
+  byId("activity").textContent = "";
+  byId(section + "-title").focus();
+}
+
+function checkVersion(revision, digest, variant) {
+  if (revision !== manifest.commit || digest !== manifest.variants[variant].controllerSha256) {
+    throw new Error("Build and displayed source versions differ");
+  }
+}
+
+async function runDemo() {
+  const request = ++requestNumber;
+  const variant = order;
+  hideResults();
+  byId("activity").textContent = "Running the C simulation…";
+  try {
+    const simulation = await import(assetUrl(variant, "simulation.mjs"));
+    checkVersion(simulation.sourceRevision, simulation.controllerSha256, variant);
+    const rows = parseTrace(await simulation.runSimulation());
+    if (request !== requestNumber) return;
+    trace = rows;
+    fillTraceTable();
+    byId("cycle").min = 0;
+    byId("cycle").max = rows.length - 1;
+    showResult("simulate");
+    selectCycle(0);
+  } catch (error) {
+    if (request !== requestNumber) return;
+    console.error(error);
+    byId("activity").textContent = "The simulation could not run. Check your connection and try Demo again in a browser with WebAssembly support.";
+  }
+}
+
+async function verify() {
+  const request = ++requestNumber;
+  const variant = order;
+  hideResults();
+  byId("activity").textContent = "Loading the Frama-C results for the displayed code…";
+  try {
+    const report = await (await fetchAsset(assetUrl(variant, "evidence.json"))).json();
+    if (request !== requestNumber) return;
+    checkVersion(report.commit, report.controllerSha256, variant);
+    if (report.variant !== variant) throw new Error("Unexpected report variant");
+    displayEvidence(report);
+    showResult("verify");
+  } catch (error) {
+    if (request !== requestNumber) return;
+    console.error(error);
+    byId("activity").textContent = "The matching verification report could not be loaded. Refresh the page and try Verify again.";
+  }
+}
+
+byId("swap-button").addEventListener("click", swapCalls);
+byId("demo-button").addEventListener("click", runDemo);
+byId("verify-button").addEventListener("click", verify);
+byId("retry-source").addEventListener("click", openEditor);
 byId("cycle").addEventListener("input", event => selectCycle(Number(event.target.value)));
 if ("ResizeObserver" in window) new ResizeObserver(drawPlot).observe(byId("plot"));
 else window.addEventListener("resize", drawPlot);
+openEditor();

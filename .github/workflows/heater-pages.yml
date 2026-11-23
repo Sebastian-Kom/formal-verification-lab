@@ -37,15 +37,22 @@ jobs:
           echo "WHY3LIB=$RUNNER_TEMP/frama-c/lib/why3" >> "$GITHUB_ENV"
           echo "WHY3DATA=$RUNNER_TEMP/frama-c/share/why3" >> "$GITHUB_ENV"
 
-      - name: Build the simulation and collect the evidence for this revision
+      - name: Build and check both call orders
         env:
           MACHDEP: x86_64
         run: |
           cp -R pages _site
           experiment=_site/examples/heater-shutdown
-          bash scripts/pages_simulation.sh "$experiment"
-          node scripts/pages_compare_simulation.mjs "$experiment"
-          python3 scripts/pages_evidence.py "$experiment"
+          sed -i -e "s|./app.js\"|./app.js?rev=$GITHUB_SHA\"|" \
+                 -e "s|./styles.css\"|./styles.css?rev=$GITHUB_SHA\"|" "$experiment/index.html"
+          work="$RUNNER_TEMP/heater-variants"
+          python3 scripts/pages_variants.py "$work" "$experiment"
+          bash scripts/pages_simulation.sh "$work" "$experiment"
+          node scripts/pages_compare_simulation.mjs "$work" "$experiment"
+          for variant in original swapped; do
+            python3 scripts/pages_evidence.py "$experiment/$variant" \
+              --variant "$variant" --controller "$experiment/$variant/controller.c"
+          done
 
       - uses: actions/upload-pages-artifact@v4
         with:

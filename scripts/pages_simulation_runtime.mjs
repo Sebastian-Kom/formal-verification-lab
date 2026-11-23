@@ -1,7 +1,7 @@
-// Appended to the sourceRevision export by pages_simulation.sh.
+// Appended to the revision and controller digest exports by pages_simulation.sh.
 // This WASI command requires only standard output and no command-line input.
 export async function runSimulation() {
-    const url = new URL(`simulation.${sourceRevision}.wasm`, import.meta.url);
+    const url = new URL(`simulation.${sourceRevision}.${controllerSha256}.wasm`, import.meta.url);
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Could not load the simulation (HTTP ${response.status}).`);
 

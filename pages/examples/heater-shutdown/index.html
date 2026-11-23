@@ -3,120 +3,120 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#143d37">
-  <meta name="description" content="Predict a heater controller’s response, run the C simulation in your browser, and explore its four Frama-C safety checks.">
+  <meta name="theme-color" content="#183d35">
+  <meta name="description" content="Read a heater controller in C, swap two calls, and compare the simulation and Frama-C safety checks for each order.">
   <title>Heater shutdown · Formal Verification Lab</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#experiment">Skip to experiment</a>
+  <a class="skip" href="#file-title">Skip to controller.c</a>
   <header class="masthead">
     <div class="shell masthead-inner">
-      <a class="brand" href="./"><span class="brandmark" aria-hidden="true"><i></i><i></i><i></i></span>Formal Verification Lab</a>
-      <a class="source" href="https://github.com/Sebastian-Kom/formal-verification-lab">Source on GitHub <span aria-hidden="true">↗</span></a>
+      <a class="brand" href="../../"><span class="brandmark" aria-hidden="true"><i></i><i></i><i></i></span>Formal Verification Lab</a>
+      <a class="source" href="https://github.com/Sebastian-Kom/formal-verification-lab">GitHub <span aria-hidden="true">↗</span></a>
     </div>
   </header>
   <main class="shell">
-    <section class="intro" aria-labelledby="page-heading">
-      <div class="intro-text">
-        <h1 id="page-heading">Heater shutdown</h1>
-        <p>Each cycle, a controller reads two temperature sensors and sends the heater an ON or OFF command. What happens when the temperature reaches its safety limit?</p>
-      </div>
-      <aside class="rule" aria-labelledby="rule-label">
-        <div class="rule-header"><h2 id="rule-label">Shutdown limit</h2><span class="rule-value">80 <small>°C</small></span></div>
-        <div class="ruler" aria-hidden="true"><i></i></div>
-        <p>If either reading reaches this limit or is invalid, the output must be OFF <strong>by the end of that same cycle</strong>.</p>
+    <div class="intro">
+      <h1>Heater shutdown</h1>
+      <p>A heater must switch off in the same control cycle that either sensor reaches 80 °C. Can you tell from the code whether it does?</p>
+    </div>
+
+    <div class="workbench">
+      <section class="editor" aria-labelledby="file-title">
+        <div class="file-bar">
+          <h2 id="file-title" tabindex="-1">controller.c</h2>
+          <span id="order-label"></span>
+        </div>
+        <div class="source-scroll" tabindex="0" role="region" aria-label="C source code">
+          <pre><code id="source-code"></code></pre>
+        </div>
+        <div class="toolbar" aria-label="Experiment controls" role="group">
+          <button type="button" class="action" id="demo-button" aria-controls="simulate" disabled>Demo</button>
+          <button type="button" class="action" id="verify-button" aria-controls="verify" disabled>Verify</button>
+          <button type="button" class="swap" id="swap-button" aria-controls="source-code" disabled><span aria-hidden="true">⇅</span> Swap calls</button>
+        </div>
+        <p role="status" id="activity" class="activity">Loading controller.c…</p>
+        <button type="button" class="retry" id="retry-source" hidden>Reload the code</button>
+        <noscript><p class="activity">Enable JavaScript to use the controls, or <a href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">open the exercise on GitHub</a>.</p></noscript>
+      </section>
+      <aside class="guide" aria-labelledby="guide-title">
+        <h2 id="guide-title">Read the controller</h2>
+        <p>Each cycle, <code>sensors_hazard</code> checks the two temperature readings. The highlighted lines then run from top to bottom.</p>
+        <dl class="glossary">
+          <dt>latch_next</dt><dd>Updates the safety lock. An engaged lock should keep the heater off.</dd>
+          <dt>heater_command</dt><dd>Uses the lock and the request for heat to decide whether to switch the heater on.</dd>
+        </dl>
+        <p><strong>Demo</strong> runs the displayed code through a heating and cooling cycle. <strong>Verify</strong> opens the Frama-C results recorded for this exact order.</p>
+        <p>Try either button. Then use <strong>Swap calls</strong> and run it again.</p>
+        <details class="contracts">
+          <summary>The four safety requirements</summary>
+          <p>Both readings must be valid and below 80 °C to count as safe. Each rule applies by the end of the current cycle.</p>
+          <ol>
+            <li><strong>A1 · Shut down.</strong> If either reading is unsafe, engage the lock and turn the heater off, even during reset.</li>
+            <li><strong>A2 · Hold the lock.</strong> If the cycle starts locked and reset is inactive, keep the lock engaged and the heater off.</li>
+            <li><strong>A3 · Release the lock.</strong> When both readings are safe and reset is active, clear the lock.</li>
+            <li><strong>A4 · Follow the heat request.</strong> With safe readings and a lock that was clear or is being reset, follow the heat request. Whenever heat is not requested, keep the heater off.</li>
+          </ol>
+          <p>The C header expresses each rule as an ACSL contract. An <code>ensures</code> clause says what must be true when the function returns. <a id="contract-link" href="https://github.com/Sebastian-Kom/formal-verification-lab/blob/main/examples/heater-shutdown/include/controller.h">Read the contracts</a></p>
+        </details>
       </aside>
+    </div>
+
+    <section id="simulate" class="panel" aria-labelledby="simulate-title" hidden>
+      <div class="panel-lead">
+        <h2 id="simulate-title" tabindex="-1">Simulation output</h2>
+        <p>The browser ran the C program with the call order shown above. Compare the readings, the safety lock and the heater output as the temperature rises and falls.</p>
+      </div>
+      <div class="trace-grid">
+        <div class="plot-box">
+          <div class="plot-heading"><h3>Sensor readings</h3><div class="legend"><span><i class="key-a"></i>A</span><span><i class="key-b"></i>B</span><span><i class="key-limit"></i>80 °C limit</span></div></div>
+          <canvas id="plot" aria-hidden="true"></canvas>
+          <label for="cycle" class="range-label">Inspect cycle <output for="cycle" id="selected-cycle"></output></label>
+          <input type="range" id="cycle" step="1" aria-describedby="cycle-help">
+          <span id="cycle-help" class="sr-only">Use the arrow keys to step through the trace one cycle at a time.</span>
+        </div>
+        <div class="snapshot"><h3>Selected cycle</h3>
+          <dl>
+            <div><dt>Sensor A</dt><dd id="sensor-a"></dd></div>
+            <div><dt>Sensor B</dt><dd id="sensor-b"></dd></div>
+            <div><dt>Heat requested</dt><dd id="heat-request"></dd></div>
+            <div><dt>Reset active</dt><dd id="reset-state"></dd></div>
+            <div><dt>Safety lock</dt><dd id="latch-state"></dd></div>
+            <div class="output-row"><dt>Heater output</dt><dd id="heater-output"></dd></div>
+          </dl>
+        </div>
+      </div>
+      <details class="trace-table" open><summary>Full simulation output <span id="table-count"></span></summary>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Simulation trace table">
+          <table><caption class="sr-only">Inputs and outputs at the end of every control cycle</caption><thead><tr><th scope="col">Cycle</th><th scope="col">A (°C)</th><th scope="col">B (°C)</th><th scope="col">Heat requested</th><th scope="col">Reset</th><th scope="col">Safety lock</th><th scope="col">Output</th></tr></thead><tbody id="trace-rows"></tbody></table>
+        </div>
+      </details>
+      <a class="back-link" href="#file-title">Back to controller.c ↑</a>
     </section>
 
-    <section id="experiment" aria-label="Heater experiment">
-      <nav aria-label="Experiment steps">
-        <ol class="steps">
-          <li><button type="button" id="step-predict" aria-controls="predict" aria-current="step"><span class="step-number">1</span> Predict</button></li>
-          <li><button type="button" id="step-simulate" aria-controls="simulate" disabled><span class="step-number">2</span> Simulate</button></li>
-          <li><button type="button" id="step-verify" aria-controls="verify" disabled><span class="step-number">3</span> Verify</button></li>
-        </ol>
-      </nav>
-      <noscript><p class="message">Enable JavaScript to run the controller in your browser, or follow the <a href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">exercise on GitHub</a>.</p></noscript>
-
-      <section id="predict" class="panel prediction" aria-labelledby="predict-title">
-        <div class="scenario">
-          <h2 id="predict-title" tabindex="-1">Make a prediction</h2>
-          <p>The heater is ON and heat is still requested. Sensor A rises by one degree. Sensor B stays below the limit.</p>
-          <div class="readings" aria-label="Sensor A changes from 79 to 80 degrees Celsius">
-            <div><span>Previous reading</span><strong>79<small> °C</small></strong></div>
-            <span class="reading-arrow" aria-hidden="true">→</span>
-            <div><span>Current reading</span><strong>80<small> °C</small></strong></div>
-          </div>
-        </div>
-        <form id="prediction-form" class="predict-form">
-          <fieldset>
-            <legend>Which command do you predict the controller will send in this cycle?</legend>
-            <div class="choices">
-              <label class="choice"><input type="radio" name="prediction" value="OFF" required><span><strong>OFF</strong><span>Stop heating</span></span></label>
-              <label class="choice"><input type="radio" name="prediction" value="ON"><span><strong>ON</strong><span>Keep heating</span></span></label>
-            </div>
-          </fieldset>
-          <button type="submit" class="action" id="run" disabled>Run simulation <span aria-hidden="true">→</span></button>
-          <p id="run-message" class="message" role="status"></p>
-        </form>
-      </section>
-
-      <section id="simulate" class="panel" aria-labelledby="simulate-title" hidden>
-        <div class="panel-lead"><h2 id="simulate-title" tabindex="-1">Read the trace</h2>
-          <p>The C controller has run in your browser. Compare your prediction of <strong id="your-pick"></strong> with the actual output at the first 80 °C reading. Move through the cycles to see what changes.</p></div>
-        <div class="trace-grid">
-          <div class="plot-box">
-            <div class="plot-heading"><h3>Sensor readings</h3><div class="legend"><span><i class="key-a"></i>A</span><span><i class="key-b"></i>B</span><span><i class="key-limit"></i>Limit</span></div></div>
-            <canvas id="plot" aria-hidden="true"></canvas>
-            <label for="cycle" class="range-label">Inspect cycle <output for="cycle" id="selected-cycle"></output></label>
-            <input type="range" id="cycle" step="1" aria-describedby="cycle-help">
-            <span id="cycle-help" class="sr-only">Use the arrow keys to step through the trace one cycle at a time.</span>
-          </div>
-          <div class="snapshot"><h3>Selected cycle</h3>
-            <dl>
-              <div><dt>Sensor A</dt><dd id="sensor-a"></dd></div>
-              <div><dt>Sensor B</dt><dd id="sensor-b"></dd></div>
-              <div><dt>Heat requested</dt><dd id="heat-request"></dd></div>
-              <div><dt>Reset active</dt><dd id="reset-state"></dd></div>
-              <div><dt>Safety lock</dt><dd id="latch-state"></dd></div>
-              <div class="output-row"><dt>Heater output</dt><dd id="heater-output"></dd></div>
-            </dl>
-          </div>
-        </div>
-        <details class="trace-table"><summary>View the full trace <span id="table-count"></span></summary>
-          <div class="table-scroll" tabindex="0" role="region" aria-label="Simulation trace table">
-            <table><caption class="sr-only">Actual inputs and outputs at the end of every control cycle</caption><thead><tr><th scope="col">Cycle</th><th scope="col">A (°C)</th><th scope="col">B (°C)</th><th scope="col">Heat requested</th><th scope="col">Reset</th><th scope="col">Safety lock</th><th scope="col">Output</th></tr></thead><tbody id="trace-rows"></tbody></table>
-          </div>
-        </details>
-        <div class="next-row"><button type="button" class="action" id="show-report">Reveal Frama-C results <span aria-hidden="true">→</span></button></div>
-      </section>
-
-      <section id="verify" class="panel" aria-labelledby="verify-title" hidden>
-        <div class="panel-lead"><h2 id="verify-title" tabindex="-1">Check the promises</h2>
-          <p>Each safety requirement is written alongside the C code as a contract. Frama-C checked these contracts when this experiment was published.</p></div>
-        <p id="report-message" class="message" role="status"></p>
-        <button type="button" class="action" id="retry-report" hidden>Retry loading results</button>
-        <div id="report-body" hidden>
-          <div class="results-grid">
-            <section class="requirements"><h3>Four requirements</h3>
-              <p>WP tries to prove each promise for every allowed input and starting state. An open result means that the proof is incomplete.</p>
-              <ol id="rule-list"></ol>
-            </section>
-            <section class="diagnosis"><h3>What happened in the simulation?</h3><p id="eva-outcome"></p>
-              <p>Eva follows the program from its first cycle forward. Its findings describe the readings and states reached along that path.</p>
-            </section>
-          </div>
-          <div class="evidence"><h3>Inspect the evidence</h3>
-            <p>C source <a id="version-link"></a><span id="proof-model"></span></p>
-            <div class="evidence-links"><a href="./wp.json">WP proof report</a><a href="./wp.log">WP log</a><a id="eva-link" href="./eva.log">Eva log</a></div>
-          </div>
-          <div class="next-row"><a id="study-source" class="action" href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">Explore the C exercise <span aria-hidden="true">↗</span></a><button type="button" id="back-to-trace" class="quiet">Return to the trace</button></div>
-        </div>
-      </section>
+    <section id="verify" class="panel" aria-labelledby="verify-title" hidden>
+      <div class="panel-lead">
+        <h2 id="verify-title" tabindex="-1">Frama-C results</h2>
+        <p>Frama-C checked this call order when the page was built. Two analyses answer different questions about the same C code.</p>
+      </div>
+      <div class="results-grid">
+        <section class="requirements"><h3 id="wp-summary"></h3>
+          <p>WP works backwards from each requirement to check every input and starting state allowed by the contract. “Unproved” means the proof remains open.</p>
+          <ol id="rule-list"></ol>
+        </section>
+        <section class="diagnosis"><h3>Did the simulation reach a violation?</h3>
+          <p>Eva follows the C simulation from its first cycle. It checks each requirement against the states the program reaches.</p>
+          <p id="eva-outcome"></p>
+        </section>
+      </div>
+      <div class="evidence"><h3>Build evidence</h3><p id="proof-model"></p>
+        <div class="evidence-links"><a id="source-link">Displayed C file</a><a id="wp-report-link">WP proof report</a><a id="wp-log-link">WP log</a><a id="eva-link">Eva log</a></div>
+      </div>
+      <a class="back-link" href="#file-title">Back to controller.c ↑</a>
     </section>
   </main>
-  <footer class="shell"><span>Formal Verification Lab</span><a href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">Read the exercise guide <span aria-hidden="true">↗</span></a></footer>
+  <footer class="shell"><a id="modules-link" href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown/src">Browse the C modules ↗</a><a href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">Read the exercise guide ↗</a></footer>
 </body>
 </html>
