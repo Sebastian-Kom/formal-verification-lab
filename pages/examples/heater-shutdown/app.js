@@ -1,4 +1,20 @@
 const byId = (id) => document.getElementById(id);
+const motion = byId("motion");
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function setDiagramMotion(playing) {
+  const path = playing ? "./heater-architecture.gif" : "./heater-architecture.png";
+  byId("diagram").src = path;
+  byId("full-size").href = path;
+  motion.dataset.playing = String(playing);
+  byId("motion-label").textContent = playing ? "Pause animation" : "Play animation";
+}
+
+setDiagramMotion(!reducedMotion.matches);
+motion.hidden = false;
+motion.addEventListener("click", () => setDiagramMotion(motion.dataset.playing !== "true"));
+reducedMotion.addEventListener("change", event => setDiagramMotion(!event.matches));
+
 const limit = 80;
 const repository = "https://github.com/Sebastian-Kom/formal-verification-lab";
 let manifest;

@@ -23,6 +23,18 @@
       <p>A heater must switch off in the same control cycle that either sensor reaches 80 °C. Can you tell from the code whether it does?</p>
     </div>
 
+    <figure class="architecture" aria-labelledby="diagram-heading">
+      <div class="figure-bar">
+        <h2 id="diagram-heading">System architecture</h2>
+        <div class="figure-actions">
+          <button id="motion" type="button" aria-controls="diagram" hidden><span aria-hidden="true" class="motion-icon"></span><span id="motion-label"></span></button>
+          <a id="full-size" href="./heater-architecture.png">View full size</a>
+        </div>
+      </div>
+      <img id="diagram" src="./heater-architecture.png" width="1232" height="420" alt="Two temperature sensors feed an electronic control unit (ECU). Its controller coordinates sensor evaluation, the safety lock and the heater command. One on/off command leaves the ECU for the heater.">
+      <figcaption>The arrows show how signals travel through the system. You can see the order of the calls in <code>controller.c</code> below.</figcaption>
+    </figure>
+
     <div class="workbench">
       <section class="editor" aria-label="Controller source and contract">
         <div class="file-bar">

@@ -80,6 +80,18 @@ tbody tr[aria-current="true"] { background: #f9eddb; }
 .intro { padding: clamp(1.8rem, 4vw, 3.25rem) 0 1.7rem; }
 .intro h1 { font-size: clamp(2.65rem, 5.2vw, 4.35rem); font-weight: 650; letter-spacing: -.076em; }
 .intro p { max-width: 46rem; margin-top: .7rem; color: var(--muted); font-size: 1.08rem; line-height: 1.5; }
+.architecture { margin: 0 0 clamp(1.25rem, 2.6vw, 2rem); overflow: hidden; background: #fff; border: 1px solid #b4c6ba; border-radius: .65rem; line-height: 1.5; }
+.figure-bar { display: flex; align-items: center; gap: .65rem 1.15rem; flex-wrap: wrap; padding: .7rem 1.1rem; border-bottom: 1px solid var(--line); }
+.figure-bar h2 { margin-right: auto; font-size: 1.32rem; font-weight: 650; letter-spacing: -.04em; }
+.figure-actions { display: flex; align-items: center; gap: .85rem; }
+.figure-actions button { display: inline-flex; align-items: center; gap: .45rem; padding: .32rem .65rem; min-height: 2rem; color: var(--green); background: #f4f8f3; border: 1px solid #a5b9ab; border-radius: .35rem; font-weight: 620; font-size: .88rem; }
+.figure-actions a { font-size: .88rem; font-weight: 620; text-underline-offset: .22em; }
+.motion-icon { width: .65rem; height: .68rem; display: inline-block; }
+#motion[data-playing="true"] .motion-icon { border-inline: 3px solid currentColor; }
+#motion[data-playing="false"] .motion-icon { height: 0; border-left: .6rem solid currentColor; border-block: .36rem solid transparent; }
+#diagram { display: block; width: 100%; height: auto; }
+.architecture figcaption { color: var(--muted); font-size: .91rem; border-top: 1px solid var(--line); padding: .65rem 1.1rem; }
+.architecture figcaption code { font-family: var(--mono); font-size: .92em; }
 .workbench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(15rem, .38fr); gap: clamp(1.5rem, 3.25vw, 3rem); align-items: start; }
 .editor { min-width: 0; background: #fff; border: 1px solid #aac0b3; border-radius: .65rem; box-shadow: 0 .2rem .8rem #203c2c08; overflow: clip; }
 .file-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 .75rem; align-items: center; padding: .35rem .8rem 0; color: #c6dacf; background: #183d35; }
@@ -140,6 +152,10 @@ footer a { font-weight: 600; text-decoration: none; }
 @media (max-width: 55rem) {
   .workbench { grid-template-columns: 1fr; gap: 1.35rem; }
   .guide { max-width: 46rem; }
+}
+@media (max-width: 40rem) {
+  .figure-bar { padding: .65rem .75rem; }
+  .architecture figcaption { padding: .55rem .75rem; }
 }
 @media (max-width: 42rem) {
   .shell { width: calc(100% - 2rem); }
