@@ -3,6 +3,7 @@ const limit = 80;
 const repository = "https://github.com/Sebastian-Kom/formal-verification-lab";
 let manifest;
 let sources;
+let headerLoading = false;
 let order = "original";
 let requestNumber = 0;
 let trace = [];
@@ -170,19 +171,19 @@ async function fetchAsset(url) {
   return response;
 }
 
-async function fetchSource(variant) {
-  const file = await (await fetchAsset(assetUrl(variant, "controller.c"))).arrayBuffer();
+async function fetchListing(url, expectedDigest) {
+  const file = await (await fetchAsset(url)).arrayBuffer();
   const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", file));
   const digest = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-  if (digest !== manifest.variants[variant].controllerSha256) throw new Error("Source version mismatch");
+  if (digest !== expectedDigest) throw new Error("Source version mismatch");
   return new TextDecoder().decode(file).replace(/\r?\n$/, "").split(/\r?\n/);
 }
 
-function renderSource() {
+function renderListing(target, lines, highlight) {
   const rows = document.createDocumentFragment();
-  for (const [index, text] of sources[order].entries()) {
+  for (const [index, text] of lines.entries()) {
     const line = document.createElement("span");
-    line.className = manifest.editableLines.includes(index + 1) ? "code-line movable" : "code-line";
+    line.className = highlight(index + 1, text) ? "code-line highlighted" : "code-line";
     const number = document.createElement("span");
     number.className = "line-number";
     number.setAttribute("aria-hidden", "true");
@@ -192,8 +193,55 @@ function renderSource() {
     line.append(number, code);
     rows.append(line);
   }
-  byId("source-code").replaceChildren(rows);
+  target.replaceChildren(rows);
+}
+
+function renderSource() {
+  renderListing(byId("source-code"), sources[order], number => manifest.editableLines.includes(number));
   byId("order-label").textContent = order === "original" ? "Original order" : "Swapped order";
+}
+
+async function loadHeader() {
+  if (headerLoading || byId("header-code").childElementCount) return;
+  headerLoading = true;
+  byId("retry-header").hidden = true;
+  byId("header-status").textContent = "Loading controller.h…";
+  try {
+    const url = new URL("./controller.h", import.meta.url);
+    url.searchParams.set("revision", manifest.commit);
+    const lines = await fetchListing(url.href, manifest.headerSha256);
+    renderListing(byId("header-code"), lines, (_number, text) => /^\s*ensures\s/.test(text));
+    const firstRule = byId("header-code").querySelector(".highlighted");
+    if (firstRule) {
+      firstRule.id = "first-requirement";
+      firstRule.tabIndex = -1;
+      byId("jump-to-rule").hidden = false;
+    }
+    byId("header-scroll").hidden = false;
+    byId("header-status").textContent = "";
+  } catch (error) {
+    console.error(error);
+    byId("header-status").textContent = "The contract file for this revision could not be loaded.";
+    byId("retry-header").hidden = false;
+  } finally {
+    headerLoading = false;
+  }
+}
+
+const tabs = [byId("implementation-tab"), byId("header-tab")];
+
+function selectTab(tab) {
+  if (tab.disabled) return;
+  for (const item of tabs) {
+    const active = item === tab;
+    item.setAttribute("aria-selected", String(active));
+    item.tabIndex = active ? 0 : -1;
+    byId(item.getAttribute("aria-controls")).hidden = !active;
+  }
+  const headerOpen = tab === byId("header-tab");
+  byId("swap-button").hidden = headerOpen;
+  tab.focus();
+  if (headerOpen) loadHeader();
 }
 
 async function openEditor() {
@@ -207,12 +255,12 @@ async function openEditor() {
         !manifest.editableLines.every(n => Number.isSafeInteger(n) && n > 0)) {
       throw new Error("Invalid source manifest");
     }
-    const [original, swapped] = await Promise.all([fetchSource("original"), fetchSource("swapped")]);
+    const [original, swapped] = await Promise.all(["original", "swapped"].map(variant =>
+      fetchListing(assetUrl(variant, "controller.c"), manifest.variants[variant].controllerSha256)));
     sources = {original, swapped};
     renderSource();
-    byId("contract-link").href = repository + "/blob/" + manifest.commit + "/examples/heater-shutdown/include/controller.h";
     byId("modules-link").href = repository + "/tree/" + manifest.commit + "/examples/heater-shutdown/src";
-    for (const id of ["demo-button", "verify-button", "swap-button"]) byId(id).disabled = false;
+    for (const id of ["demo-button", "verify-button", "swap-button", "header-tab"]) byId(id).disabled = false;
     byId("activity").textContent = "";
   } catch (error) {
     console.error(error);
@@ -238,7 +286,7 @@ function swapCalls() {
 function showResult(section) {
   byId(section).hidden = false;
   byId("activity").textContent = "";
-  byId(section + "-title").focus();
+  if (!document.activeElement?.closest('[role="tablist"], [role="tabpanel"]')) byId(section + "-title").focus();
 }
 
 function checkVersion(revision, digest, variant) {
@@ -248,6 +296,7 @@ function checkVersion(revision, digest, variant) {
 }
 
 async function runDemo() {
+  byId("demo-button").focus();
   const request = ++requestNumber;
   const variant = order;
   hideResults();
@@ -271,6 +320,7 @@ async function runDemo() {
 }
 
 async function verify() {
+  byId("verify-button").focus();
   const request = ++requestNumber;
   const variant = order;
   hideResults();
@@ -289,6 +339,25 @@ async function verify() {
   }
 }
 
+for (const tab of tabs) {
+  tab.addEventListener("click", () => selectTab(tab));
+  tab.addEventListener("keydown", event => {
+    let next;
+    if (event.key === "Home") next = tabs[0];
+    else if (event.key === "End") next = tabs[1];
+    else if (event.key === "ArrowLeft" || event.key === "ArrowRight") next = tabs.find(item => item !== tab);
+    else return;
+    event.preventDefault();
+    selectTab(next);
+  });
+}
+for (const link of document.querySelectorAll('a[href="#implementation-tab"], a[href="#header-tab"]')) {
+  link.addEventListener("click", event => {
+    event.preventDefault();
+    selectTab(byId(link.hash.slice(1)));
+  });
+}
+byId("retry-header").addEventListener("click", loadHeader);
 byId("swap-button").addEventListener("click", swapCalls);
 byId("demo-button").addEventListener("click", runDemo);
 byId("verify-button").addEventListener("click", verify);

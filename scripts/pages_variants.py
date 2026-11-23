@@ -54,14 +54,17 @@ def prepare(work, output, revision):
         controller = (source / CONTROLLER).read_bytes()
         (directory / "controller.c").write_bytes(controller)
         variants[source.name] = {"controllerSha256": sha256(controller).hexdigest()}
-    manifest = {"commit": commit, "editableLines": editable_lines, "variants": variants}
+    header = (original / "include" / "controller.h").read_bytes()
+    (output / "controller.h").write_bytes(header)
+    manifest = {"commit": commit, "headerSha256": sha256(header).hexdigest(),
+                "editableLines": editable_lines, "variants": variants}
     (output / "variants.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("work", type=Path, help="Build directory for the fresh source snapshots")
-    parser.add_argument("output", type=Path, help="Public directory for the two listings and manifest")
+    parser.add_argument("output", type=Path, help="Public directory for the source files and manifest")
     parser.add_argument("--revision", default="HEAD", help="Git revision to build")
     args = parser.parse_args()
     prepare(args.work, args.output, args.revision)

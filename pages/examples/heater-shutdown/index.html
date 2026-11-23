@@ -10,7 +10,7 @@
   <script type="module" src="./app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#file-title">Skip to controller.c</a>
+  <a class="skip" href="#implementation-tab">Skip to controller.c</a>
   <header class="masthead">
     <div class="shell masthead-inner">
       <a class="brand" href="../../"><span class="brandmark" aria-hidden="true"><i></i><i></i><i></i></span>Formal Verification Lab</a>
@@ -24,13 +24,24 @@
     </div>
 
     <div class="workbench">
-      <section class="editor" aria-labelledby="file-title">
+      <section class="editor" aria-label="Controller source and contract">
         <div class="file-bar">
-          <h2 id="file-title" tabindex="-1">controller.c</h2>
+          <div id="source-tabs" role="tablist" aria-label="Source files">
+            <button type="button" role="tab" id="implementation-tab" aria-selected="true" aria-controls="implementation-panel">controller.c</button>
+            <button type="button" role="tab" id="header-tab" aria-selected="false" aria-controls="header-panel" tabindex="-1" disabled>controller.h</button>
+          </div>
           <span id="order-label"></span>
         </div>
-        <div class="source-scroll" tabindex="0" role="region" aria-label="C source code">
+        <div class="source-scroll" id="implementation-panel" role="tabpanel" aria-labelledby="implementation-tab" tabindex="0">
           <pre><code id="source-code"></code></pre>
+        </div>
+        <div id="header-panel" role="tabpanel" aria-labelledby="header-tab" hidden>
+          <p class="header-guide">The comment beginning with <code>/*@</code> is the ACSL contract for <code>controller_step</code>. Each <code>ensures</code> clause says what must be true at the end of one cycle. <a id="jump-to-rule" href="#first-requirement" hidden>Jump to the first requirement</a></p>
+          <p role="status" id="header-status" class="activity"></p>
+          <button type="button" id="retry-header" class="retry" hidden>Reload controller.h</button>
+          <div class="source-scroll" id="header-scroll" role="region" aria-label="Header source" tabindex="0" hidden>
+            <pre><code id="header-code"></code></pre>
+          </div>
         </div>
         <div class="toolbar" aria-label="Experiment controls" role="group">
           <button type="button" class="action" id="demo-button" aria-controls="simulate" disabled>Demo</button>
@@ -48,8 +59,8 @@
           <dt>latch_next</dt><dd>Updates the safety lock. An engaged lock should keep the heater off.</dd>
           <dt>heater_command</dt><dd>Uses the lock and the request for heat to decide whether to switch the heater on.</dd>
         </dl>
-        <p><strong>Demo</strong> runs the displayed code through a heating and cooling cycle. <strong>Verify</strong> opens the Frama-C results recorded for this exact order.</p>
-        <p>Try either button. Then use <strong>Swap calls</strong> and run it again.</p>
+        <p><strong>Demo</strong> runs the selected call order through a heating and cooling cycle. <strong>Verify</strong> opens the Frama-C results recorded for this exact order.</p>
+        <p>Try either button. Then use <strong>Swap calls</strong> in <code>controller.c</code> and run it again.</p>
         <details class="contracts">
           <summary>The four safety requirements</summary>
           <p>Both readings must be valid and below 80 °C to count as safe. Each rule applies by the end of the current cycle.</p>
@@ -59,7 +70,7 @@
             <li><strong>A3 · Release the lock.</strong> When both readings are safe and reset is active, clear the lock.</li>
             <li><strong>A4 · Follow the heat request.</strong> With safe readings and a lock that was clear or is being reset, follow the heat request. Whenever heat is not requested, keep the heater off.</li>
           </ol>
-          <p>The C header expresses each rule as an ACSL contract. An <code>ensures</code> clause says what must be true when the function returns. <a id="contract-link" href="https://github.com/Sebastian-Kom/formal-verification-lab/blob/main/examples/heater-shutdown/include/controller.h">Read the contracts</a></p>
+          <p>These four rules are written in ACSL, the specification language Frama-C reads. <a href="#header-tab">Read the contract in controller.h</a></p>
         </details>
       </aside>
     </div>
@@ -93,7 +104,7 @@
           <table><caption class="sr-only">Inputs and outputs at the end of every control cycle</caption><thead><tr><th scope="col">Cycle</th><th scope="col">A (°C)</th><th scope="col">B (°C)</th><th scope="col">Heat requested</th><th scope="col">Reset</th><th scope="col">Safety lock</th><th scope="col">Output</th></tr></thead><tbody id="trace-rows"></tbody></table>
         </div>
       </details>
-      <a class="back-link" href="#file-title">Back to controller.c ↑</a>
+      <a class="back-link" href="#implementation-tab">Back to controller.c ↑</a>
     </section>
 
     <section id="verify" class="panel" aria-labelledby="verify-title" hidden>
@@ -112,9 +123,9 @@
         </section>
       </div>
       <div class="evidence"><h3>Build evidence</h3><p id="proof-model"></p>
-        <div class="evidence-links"><a id="source-link">Displayed C file</a><a id="wp-report-link">WP proof report</a><a id="wp-log-link">WP log</a><a id="eva-link">Eva log</a></div>
+        <div class="evidence-links"><a id="source-link">Selected controller.c</a><a id="wp-report-link">WP proof report</a><a id="wp-log-link">WP log</a><a id="eva-link">Eva log</a></div>
       </div>
-      <a class="back-link" href="#file-title">Back to controller.c ↑</a>
+      <a class="back-link" href="#implementation-tab">Back to controller.c ↑</a>
     </section>
   </main>
   <footer class="shell"><a id="modules-link" href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown/src">Browse the C modules ↗</a><a href="https://github.com/Sebastian-Kom/formal-verification-lab/tree/main/examples/heater-shutdown">Read the exercise guide ↗</a></footer>

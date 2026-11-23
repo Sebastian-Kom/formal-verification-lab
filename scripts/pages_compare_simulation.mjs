@@ -8,12 +8,15 @@ import {pathToFileURL} from 'node:url';
 
 const [work, output] = process.argv.slice(2);
 const manifest = JSON.parse(await readFile(resolve(output, 'variants.json'), 'utf8'));
+const header = await readFile(resolve(output, 'controller.h'));
+assert.equal(manifest.headerSha256, createHash('sha256').update(header).digest('hex'));
 // Node's fetch does not serve local files. Supply the publication directory as its origin.
 globalThis.fetch = async url => new Response(await readFile(url));
 const traces = [];
 for (const variant of ['original', 'swapped']) {
     const example = resolve(work, variant);
     const target = resolve(output, variant);
+    assert.deepEqual(await readFile(resolve(example, 'include', 'controller.h')), header);
     const source = await readFile(resolve(example, 'src', 'controller.c'));
     assert.deepEqual(await readFile(resolve(target, 'controller.c')), source);
     const digest = createHash('sha256').update(source).digest('hex');

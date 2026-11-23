@@ -1,6 +1,6 @@
 # Verifying a heater shutdown with Frama-C
 
-Try the two-line exercise in your browser. It opens on `controller.c`, the file that brings the four C modules together. [Open the live experiment](https://sebastian-kom.github.io/formal-verification-lab/examples/heater-shutdown/)
+Try the two-line exercise in your browser. It opens on `controller.c`, the file that brings the four C modules together. Open the `controller.h` tab beside it to read the contract. Each clause beginning with `ensures` states a promise the program must keep by the end of a control cycle. Both call orders are checked against those same four promises. [Open the live experiment](https://sebastian-kom.github.io/formal-verification-lab/examples/heater-shutdown/)
 
 1. Choose **Demo** to see the temperature, the interlock and the heater output for each cycle. Look at the first row where a sensor reaches 80 °C. What does the heater do?
 2. Choose **Verify** to see which of the four written requirements Frama-C could prove for the code on screen. You can start with this button, too.
