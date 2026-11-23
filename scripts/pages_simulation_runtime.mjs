@@ -21,6 +21,14 @@ export async function runSimulation() {
         args_get: () => 0,
         environ_sizes_get: emptyList,
         environ_get: () => 0,
+        // The WASI C library seeds its stack guard when the process starts.
+        random_get(address, length) {
+            const bytes = new Uint8Array(instance.exports.memory.buffer, address, length);
+            for (let start = 0; start < length; start += 65536) {
+                crypto.getRandomValues(bytes.subarray(start, start + 65536));
+            }
+            return 0;
+        },
         fd_fdstat_get(fd, address) {
             if (fd !== 1 && fd !== 2) return 8; // BADF
             const stat = new Uint8Array(instance.exports.memory.buffer, address, 24);
