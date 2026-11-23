@@ -1,5 +1,7 @@
 # Verifying a heater shutdown with Frama-C
 
+Try the exercise in your browser. Make a prediction, run the C simulation and compare your observations with the published Frama-C results. [Open the live experiment](https://sebastian-kom.github.io/formal-verification-lab/examples/heater-shutdown/)
+
 A test build of a machine controller still has to shut the heater down when a sensor detects a problem. Can we show from the C code that it will switch the heater off when either sensor reports 80 °C? Can it turn the heater back on when heating is safe again? The example has four C modules. Three handle the sensor readings, shutdown interlock and heater output. The fourth calls them once per control cycle. [Controller source](src/controller.c)
 
 ## Four requirements for one control cycle
@@ -57,6 +59,8 @@ The contract covers the software command at the end of the control cycle. Checki
 The simulation requires Make and a C11 compiler. Verification uses Frama-C with WP and Eva, the Z3 solver, and `jq` to read the proof report. This example was tested with Frama-C 33.0 and Z3 4.13.3. The build passes `CPPFLAGS` and `CFLAGS` to the analysis preprocessor as well as to the compiler. The `MACHDEP` machine model defaults to `macos_arm` and must match the target platform.
 
 WP also checks properties such as valid memory accesses and normal return from the control cycle. The build reads the fresh report and groups proof goals by requirement. Individual goals appear in `build/wp.json`, and the full tool output is in `build/wp.log`.
+
+For the browser exercise, GitHub Actions compiles the C demo to WebAssembly and runs Frama-C on the same source revision using the `x86_64` C machine model. The browser runs the simulation when you press **Run simulation**. The results screen opens the reports from that build and links to the exact C source. An open requirement with a completed analysis is a result readers can investigate. A tool failure stops publication.
 
 The caller supplies an initialized `ControllerState` object. WP 33 reports that it skips checks for pointer alignment and calls through function pointers. This example uses a properly aligned state object and direct function calls.
 

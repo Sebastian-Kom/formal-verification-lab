@@ -1,0 +1,66 @@
+name: Publish heater experiment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+
+      - name: Install Frama-C, Z3 and the WebAssembly compiler
+        run: |
+          curl --fail --location --silent --show-error --retry 3 \
+            https://www.frama-c.com/download/frama-c-linux-x86-64-33.0-Arsenic.run \
+            --output "$RUNNER_TEMP/frama-c.run"
+          printf '%s  %s\n' c754c31bb32d151acf7db3bcfdc5181b076bdbff813b19049e984f639eba3735 "$RUNNER_TEMP/frama-c.run" | sha256sum --check
+          sh "$RUNNER_TEMP/frama-c.run" --quiet -- --prefix "$RUNNER_TEMP" <<< y
+          python3 -m venv "$RUNNER_TEMP/pages-tools"
+          "$RUNNER_TEMP/pages-tools/bin/pip" install ziglang==0.13.0 z3-solver==4.13.3.0
+          echo "$RUNNER_TEMP/pages-tools/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TEMP/frama-c/bin" >> "$GITHUB_PATH"
+          echo "WHY3LIB=$RUNNER_TEMP/frama-c/lib/why3" >> "$GITHUB_ENV"
+          echo "WHY3DATA=$RUNNER_TEMP/frama-c/share/why3" >> "$GITHUB_ENV"
+
+      - name: Build the simulation and collect the evidence for this revision
+        env:
+          MACHDEP: x86_64
+        run: |
+          cp -R pages _site
+          experiment=_site/examples/heater-shutdown
+          bash scripts/pages_simulation.sh "$experiment"
+          node scripts/pages_compare_simulation.mjs "$experiment"
+          python3 scripts/pages_evidence.py "$experiment"
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
